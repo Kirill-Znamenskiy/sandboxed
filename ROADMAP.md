@@ -1,8 +1,8 @@
 # Roadmap
 
-This document is the implementation roadmap for evolving `sandboxed` from the current local launcher into a small standalone project. It is written as a handoff document: another context should be able to continue work by reading `README.md`, `AGENTS.md`, and this file.
+This document is the implementation roadmap for evolving `sandboxed` as a small standalone project. It is written as a handoff document: another context should be able to continue work by reading `README.md`, `AGENTS.md`, and this file.
 
-The current installed project copy lives at `hosts/ANY/home/kz/.sandboxed` in this repository. Until the standalone repository exists, this directory is the source of truth for `sandboxed` itself.
+This repository is now the source tree for `sandboxed` itself. Keep launcher code in `src/`, shipped targets in `targets/<target>/`, and project-local runtime overrides in `$PWD/.sandboxed/<target>/`.
 
 ## North Star
 
@@ -79,7 +79,7 @@ Preserve these throughout all phases:
 
 `project_dir` is the host working directory captured when the launcher starts.
 
-`install level` is `$HOME/.sandboxed/<target>/`.
+`install level` is `<install-root>/targets/<target>/`; in development and tests, `SANDBOXED_HOME` overrides `<install-root>`.
 
 `user level` is `${XDG_CONFIG_HOME:-$HOME/.config}/sandboxed/<target>/`.
 
@@ -114,7 +114,7 @@ Work:
 
 Acceptance criteria:
 
-* a new context can identify `hosts/ANY/home/kz/.sandboxed` as the current source of truth;
+* a new context can identify this repository as the current source of truth;
 * docs explain the three config levels and runtime selection direction;
 * docs warn not to run container build/run commands without owner confirmation.
 
@@ -128,9 +128,9 @@ Work:
 
 * add `~/.local/bin/sbxd` as the short alias stub;
 * update the macOS and server base scripts to install the `sbxd` symlink next to `sandboxed`;
-* extend usage text to document `sandboxed`, `sbxd`, `--target-name`, and minimal diagnostic flags;
-* add `--just-print-command` to print the final build/run commands without executing them;
-* add `--print-config` as a placeholder or minimal current-state dump if full config merge is not ready;
+* extend usage text to document `sandboxed`, `sbxd`, `--target`, and minimal diagnostic flags;
+* add `--just-print=commands` to print the final build/run commands without executing them;
+* add `--just-print=config` as a placeholder or minimal current-state dump if full config merge is not ready;
 * keep current `sandboxed opencode` behavior working.
 
 Acceptance criteria:
@@ -140,12 +140,12 @@ Acceptance criteria:
 * print modes do not call `podman` or `docker` build/run;
 * existing `opencode` target can still be launched the old way when execution is explicitly allowed.
 
-Status: done. `sbxd`, `--just-print-command`, and `--print-config` are implemented.
+Status: done. `sbxd`, `--just-print=commands`, and `--just-print=config` are implemented.
 
 Recommended files:
 
 * `hosts/ANY/home/kz/.local/bin/sbxd`;
-* `hosts/ANY/home/kz/.sandboxed/sandboxed.sh`;
+* `src/sandboxed.sh`;
 * `hosts/ANY-MBP/scripts/base/base.zsh`;
 * `hosts/ANY-SERV/scripts/base/base.zsh`.
 
@@ -166,7 +166,7 @@ Acceptance criteria:
 
 * missing runtimes produce a clear error;
 * automatic runtime selection chooses `podman` before `docker`;
-* `--just-print-command <target>` prints the selected runtime argv without build/run execution;
+* `--just-print=commands <target>` prints the selected runtime argv without build/run execution;
 * no runtime-specific branch silently drops the security envelope.
 
 Status: mostly done. Runtime selection is automatic and command construction supports Podman and Docker. A public runtime override is intentionally not part of the version-zero CLI.
@@ -183,7 +183,7 @@ Goal: introduce the target layout while preserving the current working target.
 
 Work:
 
-* add `compose.yaml` to `opencode/` as the first real declarative target config;
+* add `compose.yaml` to `targets/opencode/` as the first real declarative target config;
 * represent current `opencode` build context, command, XDG mounts, env, and symlink policy in the target config as far as the current parser can support;
 * add initial target directories for `claude`, `gemini`, and `codex` only when their commands and install method are confirmed;
 * keep each default target minimal and generic;
@@ -191,11 +191,11 @@ Work:
 
 Acceptance criteria:
 
-* `opencode/compose.yaml` documents the same intent as the current hardcoded logic;
+* `targets/opencode/compose.yaml` documents the same intent as the current hardcoded logic;
 * skeleton targets do not pretend to be fully tested if they are only templates;
 * target files are useful both in this repo and after future standalone extraction.
 
-Status: partially done. `opencode/compose.yaml` exists as the first target config seed. Other default targets are still pending.
+Status: partially done. `targets/opencode/compose.yaml` exists as the first target config seed. Other default targets are still pending.
 
 Recommended target names:
 
@@ -214,7 +214,7 @@ Work:
 * load `compose.yaml` from each level when present;
 * merge configs in the documented order;
 * choose the highest-priority existing `Dockerfile` rather than attempting line-level Dockerfile merge;
-* expose the effective result through `--print-config`;
+* expose the effective result through `--just-print=config`;
 * fail clearly on unsupported runtime-affecting keys instead of silently ignoring them.
 
 Critical decision:
@@ -234,10 +234,10 @@ Acceptance criteria:
 * install-only config works;
 * user-level config can override install-level config;
 * project-level config can override user-level config;
-* `--print-config` shows which files participated in the merge;
+* `--just-print=config` shows which files participated in the merge;
 * project-level lookup is limited to `$PWD/.sandboxed/<target>/` unless parent discovery is explicitly added later.
 
-Status: done for the current supported subset. `sandboxed-config.py` loads and recursively merges install, user, and project `compose.yaml` files with PyYAML and exposes the result through `--print-config`.
+Status: done for the current supported subset. `src/sandboxed-config.py` loads and recursively merges install, user, and project `compose.yaml` files with PyYAML and exposes the result through `--just-print=config`.
 
 Merge rules:
 
@@ -264,7 +264,7 @@ Acceptance criteria:
 
 * generated command for `opencode` is behaviorally equivalent to current direct logic;
 * Docker and Podman command generation share the same effective config;
-* `--just-print-command` can be used as a safe review step before execution;
+* `--just-print=commands` can be used as a safe review step before execution;
 * unsupported config keys produce actionable errors.
 
 Status: mostly done for the current supported subset. The launcher consumes the effective YAML plan for build args, env, volumes, command, workdir, symlink scan, locks, and Dockerfile/build context. The remaining work is broadening validation and reducing target-specific preparation hooks.
@@ -275,7 +275,7 @@ Goal: remove target-specific branches from the launcher where configuration can 
 
 Work:
 
-* move `opencode` XDG mount declarations into `opencode/compose.yaml` or `x-sandboxed` config;
+* move `opencode` XDG mount declarations into `targets/opencode/compose.yaml` or `x-sandboxed` config;
 * keep only generic mount expansion logic in the launcher;
 * express symlink scan directories declaratively;
 * decide whether lock checks such as `opencode.db` belong in a generic `x-sandboxed.locks` mechanism or remain a small special case until justified;
@@ -287,7 +287,7 @@ Acceptance criteria:
 * `opencode` remains a target, not a hardcoded mode;
 * any remaining special cases are explicitly documented with a removal path.
 
-Status: partially done. `opencode` XDG mounts, env, command, locks, symlink scan, and project config paths are represented in `opencode/compose.yaml`. A small hardcoded preparation step still writes the sandbox `opencode.json` copy.
+Status: partially done. `opencode` XDG mounts, env, command, locks, symlink scan, and project config paths are represented in `targets/opencode/compose.yaml`. A small hardcoded preparation step still writes the sandbox `opencode.json` copy.
 
 ## Phase 7: Test and Validation Harness
 
@@ -317,7 +317,7 @@ Work:
 
 * define standalone repository layout;
 * separate project files from this repo's host installation glue;
-* add installation docs for placing files under `$HOME/.sandboxed` and stubs under `$HOME/.local/bin`;
+* add Homebrew packaging that installs source files under `libexec`, target files from `targets/`, and exposes `sandboxed`/`sbxd` in `bin`;
 * keep this repo's `hosts/ANY` copy as an installed/vendor-like copy until the owner chooses a new source of truth;
 * decide whether this repo should later consume the standalone project by copy, submodule, package, or install script.
 
@@ -333,11 +333,11 @@ These can be done in separate contexts with low conflict risk if the phase bound
 
 * documentation and target spec: `README.md`, `ROADMAP.md`, target `compose.yaml` files;
 * CLI alias and install glue: `.local/bin/*`, `ANY-MBP/scripts/base/base.zsh`, `ANY-SERV/scripts/base/base.zsh`;
-* runtime command builder: `sandboxed.sh` runtime functions and print modes;
+* runtime command builder: `src/sandboxed.sh` runtime functions and print modes;
 * config engine: helper script and config fixtures;
 * default AI targets: `opencode`, `claude`, `gemini`, `codex` directories.
 
-Avoid running two contexts against `sandboxed.sh` at the same time unless each context has a narrow, non-overlapping section.
+Avoid running two contexts against `src/sandboxed.sh` at the same time unless each context has a narrow, non-overlapping section.
 
 ## Recommended Next Step
 
@@ -354,13 +354,12 @@ Reasoning:
 
 Before making changes in a new context:
 
-* read root `AGENTS.md`;
-* read `.sandboxed/AGENTS.md`;
-* read `.sandboxed/README.md`;
+* read `AGENTS.md`;
+* read `README.md`;
 * read this roadmap;
 * inspect current `git status --short` and relevant diffs;
 * do not run container build/run commands without explicit confirmation;
-* prefer `--just-print-command`, `--print-config`, static shell checks, and diffs for verification.
+* prefer `--just-print=commands`, `--just-print=config`, static shell checks, and diffs for verification.
 
 After making changes:
 

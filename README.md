@@ -2,11 +2,11 @@
 
 `sandboxed` runs command-line tools inside disposable containers while keeping the current host working directory as the main project directory. The primary use case is AI coding agents and other console clients such as `opencode`, `claude`, `gemini`, and `codex`, but the design is intentionally generic.
 
-This directory is currently the seed copy for a future standalone project. The README should stay useful outside this infra repository; repository-specific deployment glue belongs outside the core launcher.
+This repository is the standalone source tree. Repository-specific deployment glue belongs outside the core launcher unless it is packaging for `sandboxed` itself.
 
 ## Status
 
-The current implementation is still an early launcher, but it already has the first version-zero project pieces: `sandboxed`/`sbxd`, automatic `podman` then `docker` runtime selection, `--just-print-command`, `--print-config`, a PyYAML config helper, an initial `opencode/compose.yaml` target config, and local `just` verification recipes.
+The current implementation is still an early launcher, but it already has the first version-zero project pieces: `sandboxed`/`sbxd`, automatic `podman` then `docker` runtime selection, `--just-print=commands`, `--just-print=config`, a PyYAML config helper, an initial `targets/opencode/compose.yaml` target config, and local `just` verification recipes.
 
 The runtime command is built from the effective YAML target plan for build args, env, volumes, command, workdir, symlink scan, locks, and Dockerfile/build context. A small `opencode`-specific preparation step still creates the sandbox copy of `opencode.json`; that should eventually move behind a generic `x-sandboxed` mechanism.
 
@@ -17,12 +17,29 @@ This is a version-zero project. Do not preserve backward compatibility unless th
 The launcher itself expects a POSIX-like environment with:
 
 * `bash`;
-* `python3` with PyYAML for `sandboxed-config.py`;
+* `python3` with PyYAML for `src/sandboxed-config.py`;
 * `podman` or `docker` for real container execution.
 
 The local verification recipes additionally expect `just`.
 
 For the shipped `opencode` target, the image build uses Alpine packages and downloads OpenCode through the upstream installer, so a first build needs network access.
+
+## Installation
+
+After this repository is configured as a Homebrew tap, install the launcher with:
+
+```sh
+brew install sandboxed
+```
+
+For a fresh machine, first add the tap explicitly:
+
+```sh
+brew tap Kirill-Znamenskiy/sandboxed git@github.com:Kirill-Znamenskiy/sandboxed.git
+brew install sandboxed
+```
+
+The Homebrew formula installs launcher source under Homebrew `libexec`, installs shipped targets from `targets/`, creates both `sandboxed` and `sbxd` commands, and uses user/project config from the normal XDG/project locations.
 
 ## Core Value
 
@@ -43,13 +60,13 @@ Inside the container, the target user should be able to do everything the image 
 The project should be available through two equivalent command names:
 
 ```sh
-sandboxed <target> [args...]
-sbxd <target> [args...]
+sandboxed <target-as-command> [command args...]
+sbxd <target-as-command> [command args...]
 ```
 
 `sbxd` is only a short alias for interactive use. Both commands should call the same launcher and have the same behavior.
 
-The first positional argument is normally both the target name and the command to run inside the container:
+The first positional argument is normally both the sandboxed target name and the command to run inside the container:
 
 ```sh
 sandboxed opencode
@@ -57,21 +74,21 @@ sandboxed claude --help
 sbxd codex
 ```
 
-When the target name must differ from the command, the launcher should support an explicit target selector:
+When the sandboxed target name must differ from the command, use an explicit target selector:
 
 ```sh
-sandboxed --target-name opencode sh
+sandboxed --target opencode sh
 ```
 
 Useful inspection commands:
 
 ```sh
-sandboxed --print-config opencode
-sandboxed --just-print-command opencode
-sandboxed --just-print-command --target-name opencode sh -c 'id; pwd; opencode --version'
+sandboxed --just-print=config opencode
+sandboxed --just-print=commands opencode
+sandboxed --just-print=commands --target opencode sh -c 'id; pwd; opencode --version'
 ```
 
-`--print-config` and `--just-print-command` are safe introspection modes: they must not build images or start containers.
+`--just-print=config` and `--just-print=commands` are safe introspection modes: they must not build images or start containers.
 
 ## Responsibility
 
@@ -118,13 +135,15 @@ Future versions may allow an explicit project directory option, but the default 
 
 ## Config Levels
 
-Configuration is resolved per target from three levels. All levels use the same directory layout.
+Configuration is resolved per target from three levels. All levels use the same target directory layout.
 
-The base installation level contains defaults shipped with the installed copy:
+The base installation level contains defaults shipped with the installed copy. In this source tree, and in Homebrew `libexec`, that is:
 
 ```text
-$HOME/.sandboxed/<target>/
+<install-root>/targets/<target>/
 ```
+
+In development and tests, `SANDBOXED_HOME` can override `<install-root>`.
 
 The user level contains per-user overrides that apply to all projects:
 
@@ -141,7 +160,7 @@ $PWD/.sandboxed/<target>/
 The merge order is:
 
 ```text
-$HOME/.sandboxed/<target>/
+<install-root>/targets/<target>/
   -> ${XDG_CONFIG_HOME:-$HOME/.config}/sandboxed/<target>/
   -> $PWD/.sandboxed/<target>/
 ```
@@ -155,18 +174,19 @@ The project-level lookup should initially be limited to the current working dire
 A target directory should contain everything needed to build and run one target tool:
 
 ```text
-<target>/
-  Dockerfile
-  compose.yaml
+targets/
+  <target>/
+    Dockerfile
+    compose.yaml
 ```
 
 The planned default targets are:
 
 ```text
-opencode/
-claude/
-gemini/
-codex/
+targets/opencode/
+targets/claude/
+targets/gemini/
+targets/codex/
 ```
 
 The directory name is the target name and should normally match the command name inside the container.
@@ -241,7 +261,7 @@ This project has local `JustFile` recipes for repeatable checks:
 just check
 ```
 
-`just check` is the default quick check. It must remain safe: no image build, no container start, and no network access. It validates shell syntax, Python/YAML parsing, effective `opencode` config through `--print-config`, and generated runtime command through `--just-print-command`.
+`just check` is the default quick check. It must remain safe: no image build, no container start, and no network access. It validates shell syntax, Python/YAML parsing, effective `opencode` config through `--just-print=config`, and generated runtime command through `--just-print=commands`.
 
 Focused inspection recipes:
 
@@ -250,7 +270,7 @@ just print-config-opencode
 just print-command-opencode
 ```
 
-Use them when changing target config merging, mounts, XDG paths, runtime flags, symlink policy, lock checks, or `opencode/compose.yaml`.
+Use them when changing target config merging, mounts, XDG paths, runtime flags, symlink policy, lock checks, or `targets/opencode/compose.yaml`.
 
 Runtime smoke check:
 
