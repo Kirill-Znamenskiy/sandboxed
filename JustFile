@@ -1,0 +1,104 @@
+SANDBOXED_DIR := justfile_directory()
+
+default: list
+
+list:
+    @just --justfile '{{SANDBOXED_DIR}}/JustFile' --list --unsorted
+
+# Safe checks only: no container build/run.
+check: check-static check-config-opencode check-command-opencode
+
+check-static:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd '{{SANDBOXED_DIR}}'
+
+    bash -n sandboxed.sh
+
+    python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ["sandboxed-config.py"]]'
+    python3 -c 'from pathlib import Path; import yaml; path="opencode/compose.yaml"; data=yaml.safe_load(Path(path).read_text(encoding="utf-8")); assert isinstance(data, dict), f"Expected YAML mapping in {path}"'
+    printf '%s\n' 'OK check-static'
+
+check-config-opencode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    sandboxed_dir='{{SANDBOXED_DIR}}'
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    cd "$sandboxed_dir"
+
+    SANDBOXED_HOME="$sandboxed_dir" \
+    XDG_CONFIG_HOME="$tmp_dir/config" \
+    XDG_DATA_HOME="$tmp_dir/data" \
+    XDG_CACHE_HOME="$tmp_dir/cache" \
+    XDG_STATE_HOME="$tmp_dir/state" \
+        ./sandboxed.sh --print-config opencode > "$tmp_dir/config.yaml"
+
+    python3 -c 'from pathlib import Path; import sys, yaml; data=yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8")); sandboxed_dir=Path(sys.argv[2]); levels={level["name"]: level for level in data["levels"]}; service=data["compose"]["services"]["sandboxed"]; assert data["target"] == "opencode", "Unexpected target in printed config"; assert data["dockerfile"] == str(sandboxed_dir / "opencode" / "Dockerfile"), "Unexpected Dockerfile path in printed config"; assert levels["install"]["compose_exists"], "Install-level opencode compose.yaml was not loaded"; assert service["command"] == ["opencode"], "Unexpected opencode command in effective config"; assert service["environment"]["HOME"] == "/home/wrkuser", "Unexpected container HOME"; assert data["compose"]["x-sandboxed"]["symlinks"]["mode"] == "automount", "Unexpected symlink mode"' "$tmp_dir/config.yaml" "$sandboxed_dir"
+    printf '%s\n' 'OK check-config-opencode'
+
+check-command-opencode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    sandboxed_dir='{{SANDBOXED_DIR}}'
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    mkdir -p "$tmp_dir/project"
+    cd "$tmp_dir/project"
+
+    SANDBOXED_HOME="$sandboxed_dir" \
+    XDG_CONFIG_HOME="$tmp_dir/config" \
+    XDG_CACHE_HOME="$tmp_dir/cache" \
+    XDG_STATE_HOME="$tmp_dir/state" \
+        "$sandboxed_dir/sandboxed.sh" --just-print-command --target-name opencode sh -c 'printf "sandboxed-smoke=ok\n"; id; pwd; printf "HOME=%s\n" "$HOME"; printf "XDG_CONFIG_HOME=%s\n" "$XDG_CONFIG_HOME"; command -v opencode; opencode --version; sudo -n true; printf "sudo=ok\n"' > "$tmp_dir/command.txt"
+
+    python3 -c 'from pathlib import Path; import sys; command=Path(sys.argv[1]).read_text(encoding="utf-8"); required=[" run ", "--rm", "--cap-drop ALL", "--cap-add SETUID", "--cap-add SETGID", "--workdir", "sh", "-c", "sandboxed-smoke=ok"]; missing=[item for item in required if item not in command]; assert not missing, f"Printed command is missing {missing!r}"; assert "--security-opt" not in command and "no-new-privileges" not in command, "Printed command must not disable inner-container sudo"' "$tmp_dir/command.txt"
+    printf '%s\n' 'OK check-command-opencode'
+
+print-config-opencode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd '{{SANDBOXED_DIR}}'
+    SANDBOXED_HOME='{{SANDBOXED_DIR}}' ./sandboxed.sh --print-config opencode
+
+print-command-opencode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd '{{SANDBOXED_DIR}}'
+    SANDBOXED_HOME='{{SANDBOXED_DIR}}' ./sandboxed.sh --just-print-command --target-name opencode sh -c 'printf "sandboxed-smoke=ok\n"; id; pwd; printf "HOME=%s\n" "$HOME"; printf "XDG_CONFIG_HOME=%s\n" "$XDG_CONFIG_HOME"; command -v opencode; opencode --version; sudo -n true; printf "sudo=ok\n"'
+
+# Explicit runtime smoke: may build an image and start a disposable container.
+smoke-opencode-env:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    sandboxed_dir='{{SANDBOXED_DIR}}'
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    mkdir -p "$tmp_dir/project/.sandboxed/opencode"
+    printf '%s\n' \
+        'services:' \
+        '  sandboxed:' \
+        '    volumes:' \
+        '      - type: bind' \
+        '        source: ${SANDBOXED_PROJECT_DIR}' \
+        '        target: ${SANDBOXED_PROJECT_DIR}' \
+        'x-sandboxed:' \
+        '  symlinks:' \
+        '    scan: []' \
+        '  locks: []' \
+        > "$tmp_dir/project/.sandboxed/opencode/compose.yaml"
+    cd "$tmp_dir/project"
+
+    SANDBOXED_HOME="$sandboxed_dir" \
+        "$sandboxed_dir/sandboxed.sh" --target-name opencode sh -c 'set -eu; printf "sandboxed-smoke=ok\n"; id; pwd; printf "HOME=%s\n" "$HOME"; printf "XDG_CONFIG_HOME=%s\n" "$XDG_CONFIG_HOME"; command -v opencode; opencode --version; sudo -n true; printf "sudo=ok\n"'
+    printf '%s\n' 'OK smoke-opencode-shell'
+
+    SANDBOXED_HOME="$sandboxed_dir" \
+        "$sandboxed_dir/sandboxed.sh" --target-name opencode opencode debug config > "$tmp_dir/opencode-debug-config.json"
+    python3 -c 'from pathlib import Path; import json, sys; config=json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")); assert isinstance(config, dict), "Expected opencode config object"; assert "agent" in config, "Expected agent section in opencode config"' "$tmp_dir/opencode-debug-config.json"
+    printf '%s\n' 'opencode debug config:'
+    python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).read_text(encoding="utf-8"), end="")' "$tmp_dir/opencode-debug-config.json"
+    printf '%s\n' 'OK smoke-opencode-debug-config'

@@ -1,0 +1,56 @@
+services:
+  sandboxed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WRK_USER_ID: ${SANDBOXED_HOST_UID}
+        WRK_GROUP_ID: ${SANDBOXED_HOST_GID}
+        WRK_USER_HOME_DIR: ${SANDBOXED_CONTAINER_HOME}
+    command:
+      - opencode
+    environment:
+      HOME: ${SANDBOXED_CONTAINER_HOME}
+      XDG_DATA_HOME: ${SANDBOXED_CONTAINER_XDG_DATA_HOME}
+      XDG_STATE_HOME: ${SANDBOXED_CONTAINER_XDG_STATE_HOME}
+      XDG_CACHE_HOME: ${SANDBOXED_CONTAINER_XDG_CACHE_HOME}
+      XDG_CONFIG_HOME: ${SANDBOXED_CONTAINER_XDG_CONFIG_HOME}
+      OPENCODE_CONFIG_CONTENT: '{"permission":"allow"}'
+    working_dir: ${SANDBOXED_PROJECT_DIR}
+    volumes:
+      - type: bind
+        source: ${SANDBOXED_PROJECT_DIR}
+        target: ${SANDBOXED_PROJECT_DIR}
+      - type: bind
+        source: ${SANDBOXED_HOST_XDG_DATA_HOME}/opencode
+        target: ${SANDBOXED_CONTAINER_XDG_DATA_HOME}/opencode
+      - type: bind
+        source: ${SANDBOXED_HOST_XDG_CONFIG_HOME}/opencode
+        target: ${SANDBOXED_CONTAINER_XDG_CONFIG_HOME}/opencode
+      - type: bind
+        source: ${SANDBOXED_HOST_XDG_CACHE_HOME}/opencode
+        target: ${SANDBOXED_CONTAINER_XDG_CACHE_HOME}/opencode
+      - type: bind
+        source: ${SANDBOXED_HOST_XDG_STATE_HOME}/opencode
+        target: ${SANDBOXED_CONTAINER_XDG_STATE_HOME}/opencode
+      - type: bind
+        source: ${SANDBOXED_PROJECT_DIR}/.sandboxed/opencode/opencode.json
+        target: ${SANDBOXED_PROJECT_DIR}/opencode.json
+        read_only: true
+
+x-sandboxed:
+  symlinks:
+    mode: automount
+    scan:
+      - host: ${SANDBOXED_HOST_XDG_CONFIG_HOME}/opencode
+        container: ${SANDBOXED_CONTAINER_XDG_CONFIG_HOME}/opencode
+  opencode:
+    project_config:
+      source: ${SANDBOXED_PROJECT_DIR}/opencode.json
+      sandbox_copy: ${SANDBOXED_PROJECT_DIR}/.sandboxed/opencode/opencode.json
+      container_target: ${SANDBOXED_PROJECT_DIR}/opencode.json
+  locks:
+    - path: ${SANDBOXED_HOST_XDG_DATA_HOME}/opencode/opencode.db
+      related_suffixes:
+        - -wal
+        - -shm
