@@ -2,11 +2,20 @@
 
 ## Scope
 
-This directory is the current installed copy of the `sandboxed` project: `hosts/ANY/home/kz/.sandboxed`. Treat it as the seed of a future standalone project, not as incidental host configuration.
+This repository is the standalone source tree for the `sandboxed` project. Treat host-specific deployment glue as outside the core project unless there is a concrete packaging reason to keep it here.
 
 Keep implementation generic. Do not couple `sandboxed` to unrelated details of this infra repository unless there is a concrete deployment reason.
 
 This is version-zero work. Do not add backward-compatibility aliases or compatibility branches unless the owner explicitly asks for them.
+
+Use GitFlow-style feature work. New product changes should happen on named feature branches rather than directly on `main`. Merge feature branches back to `main` with `--no-ff`; do not fast-forward GitFlow merges.
+
+Keep the repository root sparse:
+
+- `src/` contains the launcher source code and helper scripts.
+- `targets/<target>/` contains shipped target-specific files such as `compose.yaml` and `Dockerfile`.
+- `Formula/` contains Homebrew formula packaging.
+- `$PWD/.sandboxed/<target>/` remains project-local runtime config, not shipped target source.
 
 ## Project Goal
 
@@ -26,23 +35,25 @@ Do not optimize defaults around remote Git push from inside the container. Treat
 
 The intended public commands are `sandboxed` and `sbxd`. `sbxd` is only a short alias and should call the same launcher.
 
-The normal form is `sandboxed <target> [args...]`, where the target usually matches the command inside the container. Keep support for an explicit target name, such as `sandboxed --target-name opencode sh`, when the target and command differ.
+The normal form is `sandboxed <target> [args...]`, where the target usually matches the command inside the container. Keep support for an explicit target selector, such as `sandboxed --target opencode sh`, when the target and command differ.
 
 ## Config Model
 
 Targets are resolved from three levels, in this order:
 
-1. `$HOME/.sandboxed/<target>/`
+1. `<install-root>/targets/<target>/`
 2. `${XDG_CONFIG_HOME:-$HOME/.config}/sandboxed/<target>/`
 3. `$PWD/.sandboxed/<target>/`
 
-All levels use the same layout. Later levels override earlier levels. The project level is the current working directory only unless a later explicit feature adds parent-directory discovery.
+The install root is the directory installed by the package manager; in development and tests it may be overridden with `SANDBOXED_HOME`. All levels use the same target layout. Later levels override earlier levels. The project level is the current working directory only unless a later explicit feature adds parent-directory discovery.
 
 Prefer `compose.yaml` as the declarative target config. The launcher may parse it and translate it into direct `podman` or `docker` commands; it does not need to use Compose as the runtime.
 
 Use `x-sandboxed` for launcher-specific options that are not native Compose concepts.
 
-The current config helper is `sandboxed-config.py` and requires `python3` with PyYAML. Keep YAML handling there; do not add ad-hoc YAML parsing in bash.
+The current config helper is `src/sandboxed-config.py` and requires `python3` with PyYAML. Keep YAML handling there; do not add ad-hoc YAML parsing in bash.
+
+Homebrew should install `sandboxed` so the normal command is exactly `brew install sandboxed` after the tap is configured. The formula should keep source files under Homebrew `libexec`, install shipped targets from `targets/`, and expose both `sandboxed` and `sbxd` commands.
 
 ## Runtime
 
@@ -58,7 +69,7 @@ Do not run `podman build`, `podman run`, `docker build`, or `docker run` without
 
 Safe checks include reading files, static shell validation, diff inspection, and printing generated configs or commands.
 
-Use `--print-config` and `--just-print-command` for safe launcher verification. These modes must not build images or start containers.
+Use `--just-print=config` and `--just-print=commands` for safe launcher verification. These modes must not build images or start containers.
 
 ## Verification
 
@@ -68,9 +79,9 @@ Keep local verification recipes in `JustFile` in this directory. The default qui
 just check
 ```
 
-Run `just check` after every change in `sandboxed`. It must stay safe: no image build, no container start, no network. It should cover shell syntax, Python/YAML parsing, effective `opencode` config through `--print-config`, and generated runtime command through `--just-print-command`.
+Run `just check` after every change in `sandboxed`. It must stay safe: no image build, no container start, no network. It should cover shell syntax, Python/YAML parsing, effective `opencode` config through `--just-print=config`, and generated runtime command through `--just-print=commands`.
 
-When changing target config resolution, merge behavior, XDG paths, mounts, command args, symlink policy, lock checks, runtime flags, or `opencode/compose.yaml`, also inspect the focused outputs:
+When changing target config resolution, merge behavior, XDG paths, mounts, command args, symlink policy, lock checks, runtime flags, or `targets/opencode/compose.yaml`, also inspect the focused outputs:
 
 ```sh
 just print-config-opencode

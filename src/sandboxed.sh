@@ -3,23 +3,30 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: sandboxed [--rebuild] [--just-print-command] [--print-config] [--target-name <target-name>] <target> [target args...]
-       sbxd      [--rebuild] [--just-print-command] [--print-config] [--target-name <target-name>] <target> [target args...]
+Usage: sbxd      [--rebuild] [--just-print=config|commands] [--target <target>] <target-as-command> [command args...]
+       sandboxed [--rebuild] [--just-print=config|commands] [--target <target>] <target-as-command> [command args...]
+
 
 Run a target tool inside a disposable Podman or Docker container for the current directory.
-Sandbox targets live in ~/.sandboxed/<target>/Dockerfile.
+Shipped sandbox targets live in the installed targets/<target>/ directory.
 
 Examples:
-  sandboxed opencode
-  sandboxed opencode --help
   sbxd opencode
-  sandboxed --target-name opencode sh
+  sandboxed opencode
+  sandboxed opencode -c
+  sandboxed opencode --help
+  sandboxed --target opencode sh
+
+Options:
+  --target <target>       Use this sandboxed target config while running <target-as-command>.
+  --just-print=config     Print the effective merged target config and exit without building or running a container.
+  --just-print=commands   Print the generated build/run commands and exit without building or running a container.
 EOF
 }
 
 rebuild=0
 just_print_command=0
-print_config=0
+just_print_config=0
 target_name=""
 command_args=()
 target_arg=""
@@ -33,17 +40,21 @@ while [ "$#" -gt 0 ]; do
             rebuild=1
             shift
             ;;
-        --just-print-command)
+        --just-print=commands)
             just_print_command=1
             shift
             ;;
-        --print-config)
-            print_config=1
+        --just-print=config)
+            just_print_config=1
             shift
             ;;
-        --target-name)
+        --just-print=*)
+            printf 'Unsupported --just-print value: %s\n' "${1#--just-print=}" >&2
+            exit 1
+            ;;
+        --target)
             if [ "$#" -lt 2 ]; then
-                printf '%s\n' "Missing value for --target-name" >&2
+                printf '%s\n' "Missing value for --target" >&2
                 exit 1
             fi
             target_name="$2"
@@ -83,7 +94,7 @@ fi
 
 case "$target_name" in
     *[!A-Za-z0-9._-]* | .* | -* | *..*)
-        printf 'Invalid sandbox target: %s\n' "$target_name" >&2
+        printf 'Invalid sandboxed target: %s\n' "$target_name" >&2
         exit 1
         ;;
 esac
@@ -96,7 +107,7 @@ if command -v podman >/dev/null 2>&1; then
 elif command -v docker >/dev/null 2>&1; then
     runtime="docker"
     runtime_available=1
-elif [ "$just_print_command" = 1 ] || [ "$print_config" = 1 ]; then
+elif [ "$just_print_command" = 1 ] || [ "$just_print_config" = 1 ]; then
     runtime="podman"
 else
     printf '%s\n' "podman or docker is required but neither was found in PATH" >&2
@@ -104,6 +115,8 @@ else
 fi
 
 project_dir="$(pwd -P)"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+default_sandboxed_home="$(cd -- "$script_dir/.." && pwd -P)"
 
 host_xdg_data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
 host_xdg_state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
@@ -116,11 +129,12 @@ container_xdg_state_home="$container_wrk_user_home_dir/.local/state"
 container_xdg_cache_home="$container_wrk_user_home_dir/.cache"
 container_xdg_config_home="$container_wrk_user_home_dir/.config"
 
-sandboxed_home_dir="${SANDBOXED_HOME:-$HOME/.sandboxed}"
-sandboxed_target_dir="$sandboxed_home_dir/$target_name"
+sandboxed_home_dir="${SANDBOXED_HOME:-$default_sandboxed_home}"
+sandboxed_python="${SANDBOXED_PYTHON:-python3}"
+sandboxed_target_dir="$sandboxed_home_dir/targets/$target_name"
 sandboxed_user_target_dir="$host_xdg_config_home/sandboxed/$target_name"
 sandboxed_project_target_dir="$project_dir/.sandboxed/$target_name"
-config_helper="$sandboxed_home_dir/sandboxed-config.py"
+config_helper="$sandboxed_home_dir/src/sandboxed-config.py"
 dockerfile="$sandboxed_target_dir/Dockerfile"
 install_compose_file="$sandboxed_target_dir/compose.yaml"
 user_compose_file="$sandboxed_user_target_dir/compose.yaml"
@@ -152,8 +166,8 @@ config_helper_args=(
     --container-xdg-config-home "$container_xdg_config_home"
 )
 
-if [ "$print_config" = 1 ]; then
-    exec env PYTHONDONTWRITEBYTECODE=1 python3 "$config_helper" "${config_helper_args[@]}"
+if [ "$just_print_config" = 1 ]; then
+    exec env PYTHONDONTWRITEBYTECODE=1 "$sandboxed_python" "$config_helper" "${config_helper_args[@]}"
     exit 0
 fi
 
@@ -244,7 +258,7 @@ load_target_plan() {
                 exit 1
                 ;;
         esac
-    done < <(PYTHONDONTWRITEBYTECODE=1 python3 "$config_helper" --format plan "${config_helper_args[@]}")
+    done < <(PYTHONDONTWRITEBYTECODE=1 "$sandboxed_python" "$config_helper" --format plan "${config_helper_args[@]}")
 }
 
 print_shell_command() {
