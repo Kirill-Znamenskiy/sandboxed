@@ -1,6 +1,6 @@
 ---
 name: release-sandboxed
-description: Use when closing a sandboxed feature branch, merging dev to main, tagging sandboxed and homebrew-sandboxed, updating the Homebrew formula, or publishing a GitHub release.
+description: Use when preparing a sandboxed release branch, merging feature branches into a release, tagging sandboxed and homebrew-sandboxed, updating the Homebrew formula, or publishing a GitHub release.
 ---
 
 # Release Sandboxed
@@ -26,25 +26,29 @@ The core repository is GitFlow-based. The Homebrew tap is not GitFlow-based and 
 
 ## Preflight
 
-1. In the core repository, inspect `git status --short --branch`, `git log --oneline -10`, and the feature branch commits since `dev`.
+1. In the core repository, inspect `git status --short --branch`, `git log --oneline -10`, and the selected feature branch commits since `dev`.
 2. In the tap repository, inspect `git status --short --branch`, `git log --oneline -10`, and the formula state.
-3. Confirm the release version. If the owner did not specify it, infer the next patch version from the current `sandboxed --version` and existing tags, then ask before editing versioned files.
-4. Check that the core feature branch contains all intended commits and no uncommitted release work remains.
-5. Run `just check` in the core repository before any merge.
-6. For runtime-affecting changes, run or require owner approval for `just check-real-starts`. If the owner already ran it after the latest relevant change, record that result instead of rerunning.
+3. Confirm the release version. If the owner did not specify it, infer the next patch version from existing tags, then ask before creating or editing a release branch.
+4. Confirm which feature branches should be collected into the release branch.
+5. Check that each feature branch contains all intended commits and no uncommitted release work remains.
+6. Run `just check` in the core repository before any merge.
+7. For runtime-affecting changes, run or require owner approval for `just check-real-starts`. If the owner already ran it after the latest relevant change, record that result instead of rerunning.
 
 ## Core Release Flow
 
-1. If a version bump is needed, make it on the feature branch before merging. Update every source file that reports or documents the release version, then run `just check` and commit the bump separately.
-2. Switch to `dev` and make sure it is up to date with its remote before merging.
-3. Merge the feature branch into `dev` with `git merge --no-ff <feature-branch>`.
-4. Run `just check` on `dev`. If the release depends on actual startup, also handle `just check-real-starts` under the hard gate above.
-5. Push `dev` only after owner approval.
-6. Switch to `main` and make sure it is up to date with its remote.
-7. Merge `dev` into `main` with `git merge --no-ff dev` for the deliberate release checkpoint.
-8. Run `just check` on `main`.
-9. Create an annotated core tag `vX.Y.Z` on `main` after verification.
-10. Push `main` and the core tag only after owner approval.
+1. Switch to `dev` and make sure it is up to date with its remote before cutting a release branch.
+2. Create or switch to the named release branch from `dev`, such as `release/vX.Y.Z`.
+3. Merge each selected feature branch into the release branch with `git merge --no-ff <feature-branch>`.
+4. Run `just check` on the release branch. If the release depends on actual startup, also handle `just check-real-starts` under the hard gate above.
+5. Make the version bump on the release branch only. Update every source file that reports or documents the release version, then run `just check` and commit the bump separately.
+6. Merge the release branch back to `dev` with `git merge --no-ff <release-branch>` so `dev` receives the exact released state.
+7. Run `just check` on `dev`.
+8. Push `dev` only after owner approval.
+9. Switch to `main` and make sure it is up to date with its remote.
+10. Merge the release branch into `main` with `git merge --no-ff <release-branch>` for the deliberate release checkpoint.
+11. Run `just check` on `main`.
+12. Create an annotated core tag `vX.Y.Z` on `main` after verification.
+13. Push `main` and the core tag only after owner approval.
 
 ## GitHub Release
 
@@ -71,6 +75,7 @@ Report the final state with:
 
 - Core branch and commit pushed to `dev`.
 - Core branch and commit pushed to `main`.
+- Core release branch name and version bump commit.
 - Core tag and GitHub release URL.
 - Tap commit and tap tag.
 - Checks run, including whether `just check-real-starts` was run by the owner or by the assistant.
