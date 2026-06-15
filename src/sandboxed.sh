@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+sandboxed_version="0.0.2"
+
 usage() {
     cat <<'EOF'
 Usage: sbxd      [--rebuild] [--just-print=config|commands] [--target <target>] <target-as-command> [command args...]
@@ -18,6 +20,7 @@ Examples:
   sandboxed --target opencode sh
 
 Options:
+  --version               Print sandboxed version and exit.
   --target <target>       Use this sandboxed target config while running <target-as-command>.
   --just-print=config     Print the effective merged target config and exit without building or running a container.
   --just-print=commands   Print the generated build/run commands and exit without building or running a container.
@@ -34,6 +37,10 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --help)
             usage
+            exit 0
+            ;;
+        --version)
+            printf 'sandboxed %s\n' "$sandboxed_version"
             exit 0
             ;;
         --rebuild)
