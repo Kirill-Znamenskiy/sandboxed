@@ -1,0 +1,3 @@
+x-sandboxed:
+  locks:
+    enabled: false

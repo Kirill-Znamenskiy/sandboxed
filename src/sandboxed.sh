@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-sandboxed_version="0.0.4"
+sandboxed_version="0.0.5"
 
 usage() {
     cat <<'EOF'
@@ -131,6 +131,8 @@ host_xdg_cache_home="${XDG_CACHE_HOME:-$HOME/.cache}"
 host_xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 container_wrk_user_home_dir="/home/wrkuser"
+container_wrk_user_id="1111"
+container_wrk_group_id="1111"
 container_xdg_data_home="$container_wrk_user_home_dir/.local/share"
 container_xdg_state_home="$container_wrk_user_home_dir/.local/state"
 container_xdg_cache_home="$container_wrk_user_home_dir/.cache"
@@ -146,7 +148,11 @@ dockerfile="$sandboxed_target_dir/Dockerfile"
 install_compose_file="$sandboxed_target_dir/compose.yaml"
 user_compose_file="$sandboxed_user_target_dir/compose.yaml"
 project_compose_file="$sandboxed_project_target_dir/compose.yaml"
-image_name="${SANDBOXED_IMAGE:-localhost/sandboxed-$runtime-$target_name:uid-$(id -u)}"
+image_uid_tag="$(id -u)"
+if [ "$runtime" = "podman" ]; then
+    image_uid_tag="$container_wrk_user_id"
+fi
+image_name="${SANDBOXED_IMAGE:-localhost/sandboxed-$runtime-$target_name:uid-$image_uid_tag}"
 container_name="sandboxed-$target_name-$(date +%s)-$$"
 
 if [ ! -x "$config_helper" ]; then
@@ -353,9 +359,11 @@ print_run_command_pretty() {
     print_command_line "$option_prefix" 1 --name "$container_name"
     print_command_line "$option_prefix" 1 --hostname "$container_name"
     if [ "$runtime" = "podman" ]; then
-        print_command_line "$option_prefix" 1 --userns keep-id
+        print_command_line "$option_prefix" 1 --userns "keep-id:uid=$container_wrk_user_id,gid=$container_wrk_group_id"
+        print_command_line "$option_prefix" 1 --user "$container_wrk_user_id:$container_wrk_group_id"
+    else
+        print_command_line "$option_prefix" 1 --user "$(id -u):$(id -g)"
     fi
-    print_command_line "$option_prefix" 1 --user "$(id -u):$(id -g)"
     print_command_line "$option_prefix" 1 --cap-drop ALL
     print_command_line "$option_prefix" 1 --cap-add SETUID
     print_command_line "$option_prefix" 1 --cap-add SETGID
@@ -576,6 +584,11 @@ check_symlinks_in_mounted_dirs() {
 
 load_target_plan
 
+if [ "$runtime" = "docker" ]; then
+    build_arg_args+=(--build-arg "WRK_USER_ID=$(id -u)")
+    build_arg_args+=(--build-arg "WRK_GROUP_ID=$(id -g)")
+fi
+
 if [ ! -f "$dockerfile" ]; then
     printf 'Dockerfile not found: %s\n' "$dockerfile" >&2
     exit 1
@@ -670,8 +683,8 @@ if [ "$runtime" = "podman" ]; then
         "${tty_args[@]}"
         --name "$container_name"
         --hostname "$container_name"
-        --userns keep-id
-        --user "$(id -u):$(id -g)"
+        --userns "keep-id:uid=$container_wrk_user_id,gid=$container_wrk_group_id"
+        --user "$container_wrk_user_id:$container_wrk_group_id"
         --cap-drop ALL
         --cap-add SETUID
         --cap-add SETGID
