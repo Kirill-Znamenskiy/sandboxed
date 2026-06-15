@@ -50,7 +50,9 @@ x-sandboxed:
       sandbox_copy: ${SANDBOXED_PROJECT_DIR}/.sandboxed/opencode/opencode.json
       container_target: ${SANDBOXED_PROJECT_DIR}/opencode.json
   locks:
-    - path: ${SANDBOXED_HOST_XDG_DATA_HOME}/opencode/opencode.db
-      related_suffixes:
-        - -wal
-        - -shm
+    enabled: true
+    checks:
+      - path: ${SANDBOXED_HOST_XDG_DATA_HOME}/opencode/opencode.db
+        related_suffixes:
+          - -wal
+          - -shm
