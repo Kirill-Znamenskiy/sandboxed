@@ -271,6 +271,31 @@ x-sandboxed:
 
 The target config owns this policy. Do not add launch flags for symlink behavior unless there is a concrete new need that cannot be expressed in target config.
 
+## Lock Checks
+
+Targets may declare host lock files that should block a second sandboxed launch when another target instance is already using the same state.
+
+```yaml
+x-sandboxed:
+  locks:
+    enabled: true
+    checks:
+      - path: ${SANDBOXED_HOST_XDG_DATA_HOME}/opencode/opencode.db
+        related_suffixes:
+          - -wal
+          - -shm
+```
+
+Project-level config can disable these checks when concurrent use is known to be safe for that project:
+
+```yaml
+x-sandboxed:
+  locks:
+    enabled: false
+```
+
+Disabling lock checks only skips the repeated-launch guard. It does not change mounts, credentials, or other container access.
+
 ## Verification
 
 This project has local `JustFile` recipes for repeatable checks:
