@@ -8,7 +8,13 @@ Keep implementation generic. Do not couple `sandboxed` to unrelated details of t
 
 This is version-zero work. Do not add backward-compatibility aliases or compatibility branches unless the owner explicitly asks for them.
 
-Use GitFlow-style feature work. New product changes should happen on named feature branches rather than directly on `main`. Merge feature branches back to `main` with `--no-ff`; do not fast-forward GitFlow merges.
+Use GitFlow-style branching:
+
+- `main` is release-only. Do not commit ordinary development fixes directly to `main`.
+- `dev` is the integration branch for ongoing work.
+- New product changes should happen on named feature branches from `dev`.
+- Merge feature branches back to `dev` with `--no-ff`; do not fast-forward GitFlow merges.
+- Merge `dev` back to `main` only for a deliberate release/stable checkpoint, also with `--no-ff`.
 
 Keep the repository root sparse:
 
