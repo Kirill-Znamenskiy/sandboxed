@@ -8,13 +8,19 @@ Keep implementation generic. Do not couple `sandboxed` to unrelated details of t
 
 This is version-zero work. Do not add backward-compatibility aliases or compatibility branches unless the owner explicitly asks for them.
 
-Use GitFlow-style feature work. New product changes should happen on named feature branches rather than directly on `main`. Merge feature branches back to `main` with `--no-ff`; do not fast-forward GitFlow merges.
+Use GitFlow-style branching:
+
+- `main` is release-only. Do not commit ordinary development fixes directly to `main`.
+- `dev` is the integration branch for ongoing work.
+- New product changes should happen on named feature branches from `dev`.
+- Merge feature branches back to `dev` with `--no-ff`; do not fast-forward GitFlow merges.
+- Merge `dev` back to `main` only for a deliberate release/stable checkpoint, also with `--no-ff`.
 
 Keep the repository root sparse:
 
 - `src/` contains the launcher source code and helper scripts.
 - `targets/<target>/` contains shipped target-specific files such as `compose.yaml` and `Dockerfile`.
-- `Formula/` contains Homebrew formula packaging.
+- `homebrew/` is an ignored local checkout of the separate `homebrew-sandboxed` tap repository when needed for packaging work.
 - `$PWD/.sandboxed/<target>/` remains project-local runtime config, not shipped target source.
 
 ## Project Goal
@@ -53,7 +59,7 @@ Use `x-sandboxed` for launcher-specific options that are not native Compose conc
 
 The current config helper is `src/sandboxed-config.py` and requires `python3` with PyYAML. Keep YAML handling there; do not add ad-hoc YAML parsing in bash.
 
-Homebrew should install `sandboxed` so the normal command is exactly `brew install sandboxed` after the tap is configured. The formula should keep source files under Homebrew `libexec`, install shipped targets from `targets/`, and expose both `sandboxed` and `sbxd` commands.
+Homebrew should install `sandboxed` so the normal command is exactly `brew install sandboxed` after the tap is configured. The formula lives in the separate `Kirill-Znamenskiy/homebrew-sandboxed` tap repository, should keep source files under Homebrew `libexec`, install shipped targets from `targets/`, and expose both `sandboxed` and `sbxd` commands.
 
 ## Runtime
 
