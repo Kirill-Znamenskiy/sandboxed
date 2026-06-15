@@ -100,6 +100,7 @@ sandboxed --target opencode sh
 Useful inspection commands:
 
 ```sh
+sandboxed --version
 sandboxed --just-print=config opencode
 sandboxed --just-print=commands opencode
 sandboxed --just-print=commands --target opencode sh -c 'id; pwd; opencode --version'
