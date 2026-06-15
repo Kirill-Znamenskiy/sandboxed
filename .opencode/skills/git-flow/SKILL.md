@@ -3,24 +3,32 @@ name: git-flow
 description: Use ONLY when the project follows Git Flow and the user wants to open or close a feature/feat branch, publish a release, or publish a hotfix.
 ---
 
-# Git Flow
+# Git-Flow
 
 Use this skill only when both conditions are true:
 
-- The current project follows Git Flow or explicitly uses equivalent long-lived branches such as `main`/`master` plus `dev`/`develop`.
-- The user wants to open or close a `feature/*` or `feat/*` branch, publish a release, or publish a hotfix.
+- The current project follows Git-Flow or explicitly uses equivalent long-lived branches.
+- The user wants to open or close a `feat/*` or `feature/*` branch, publish a release, or publish a hotfix.
+
+This skill is based on Atlassian's Gitflow workflow description: https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow
 
 Do not use this skill for trunk-based development, GitHub Flow, ad-hoc branch cleanup, ordinary commits, or repositories whose branching model is unknown. If the branch names are unclear, inspect the repository and ask one short question before changing branches.
 
+## Naming
+
+Use the shorter canonical names when opening new branches: `main`, `dev`, `feat/`, `release/`, and `hotfix/`.
+
+If an existing project uses longer Git-Flow names such as `master`, `develop`, or `feature/`, recognize them and work with them, but keep the rest of these instructions written in canonical terms.
+
 ## Branch Roles
 
-- Production branch: `main` or `master`. Released code and release tags live here.
-- Integration branch: `dev` or `develop`. Completed features collect here before release preparation.
-- Feature branches: `feature/<name>` or `feat/<name>`. Start from integration and finish back into integration.
-- Release branches: `release/<version>`. Start from integration, collect the intended release state, receive the version bump, then merge into production and integration.
-- Hotfix branches: `hotfix/<version-or-name>`. Start from production, contain only the urgent fix and its release metadata, then merge into production and integration.
+- Production branch: `main`. It stores the official release history and receives version tags. Every commit in `main` is a release and must have its own tag.
+- Integration branch: `dev`. It contains the complete development history and integrates finished features.
+- Feature branches: `feat/<name>`. They start from `dev` and finish back into `dev`. Features never interact directly with `main`.
+- Release branches: `release/<version>`. They start from `dev` after enough features are ready or a scheduled release date approaches. Creating one starts the next release cycle: no new features go into that release branch, only bug fixes, documentation, and other release-oriented work.
+- Hotfix branches: `hotfix/<version-or-name>`. They start from `main` and are the only supporting branches that should fork directly from `main`. They contain only an urgent production fix and its release metadata.
 
-Prefer `--no-ff` merges for Git Flow branch finishes so branch boundaries remain visible. Do not fast-forward feature, release, or hotfix completion unless the owner explicitly asks.
+Always finish Git Flow branches with non-fast-forward merges. Use `git merge --no-ff <branch>` so feature, release, and hotfix branch boundaries remain visible.
 
 ## Hard Gates
 
@@ -33,90 +41,92 @@ Prefer `--no-ff` merges for Git Flow branch finishes so branch boundaries remain
 ## Preflight
 
 1. Inspect `git status --short --branch`, `git log --oneline -10`, local branches, remotes, and tags.
-2. Identify production and integration branch names from existing branches and project instructions.
+2. Identify production and integration branch names from existing branches and project instructions. Use canonical terms `main` and `dev` in the plan unless the actual commands must target existing longer branch names.
 3. Identify the current branch and whether it has uncommitted changes.
-4. Inspect commits that are about to move between branches, for example `<integration>..<feature>` or `<production>..<hotfix>`.
+4. Inspect commits that are about to move between branches, for example `dev..<feat-branch>` or `main..<hotfix-branch>`.
 5. Run the repository's safe checks before branch completion or publication. If no standard check is documented, ask or run only clearly safe static checks.
 6. If remote state matters, fetch only after confirming that network access is acceptable.
 
 ## Opening A Feature Branch
 
 1. Ensure the requested work is normal product development, not release stabilization or urgent production repair.
-2. Start from the integration branch: `dev` or `develop`.
-3. Make sure the integration branch is current enough for the project policy.
-4. Create `feature/<name>` or `feat/<name>` from integration.
+2. Start from the latest `dev`.
+3. Make sure `dev` is current enough for the project policy.
+4. Create `feat/<name>` from `dev`.
 5. Do not version-bump just because a feature branch is opened.
 
 ## Closing A Feature Branch
 
 1. Ensure the feature branch has no uncommitted changes unless those changes should be committed first.
 2. Run the repository's safe checks on the feature branch.
-3. Switch to the integration branch.
-4. Merge the feature branch with `git merge --no-ff <feature-or-feat-branch>`.
-5. Run safe checks on integration after the merge.
-6. Push integration only after owner approval.
+3. Switch to `dev`.
+4. Merge the feature branch into `dev` with `git merge --no-ff <feat-branch>`.
+5. Run safe checks on `dev` after the merge.
+6. Push `dev` only after owner approval.
 7. Delete the feature branch only after owner approval.
 
 ## Publishing A Release
 
-Release publication starts from integration, not directly from a feature branch.
+Release publication starts from `dev`, not directly from a feature branch.
 
 If the user asks to publish a release while currently on a feature or `feat` branch:
 
-1. First finish the current feature branch into integration if it is intended for this release.
+1. First finish the current feature branch into `dev` if it is intended for this release.
 2. Commit any unfinished feature work before leaving the feature branch, or ask if it is not ready.
-3. Run safe checks on the feature branch, merge it into integration with `--no-ff`, then run safe checks on integration.
-4. Only after integration contains the intended feature state, create the release branch from integration.
+3. Run safe checks on the feature branch, merge it into `dev` with `git merge --no-ff <feat-branch>`, then run safe checks on `dev`.
+4. Only after `dev` contains the intended feature state, create the release branch from `dev`.
 
 Normal release flow:
 
-1. Start from the integration branch.
-2. Create `release/<version>` from integration.
-3. Merge any additional selected feature branches into the release branch with `--no-ff`, if the project collects features there instead of directly in integration.
-4. Make release-only changes on the release branch: version bump, changelog, lockfile metadata, or final release notes.
-5. Run safe checks on the release branch.
-6. Merge the release branch into the production branch with `--no-ff`.
-7. Tag the production branch at the release merge commit, usually with an annotated tag such as `vX.Y.Z`.
-8. Merge the release branch back into integration with `--no-ff` so integration receives the exact released version bump and release metadata.
-9. Run safe checks after the production and integration merges where practical.
+1. Start from `dev`.
+2. Create `release/<version>` from `dev`.
+3. Treat the release branch as feature-frozen. Do not merge new features into it. Put only bug fixes, documentation generation, version bumps, changelog updates, lockfile metadata, final release notes, and other release-oriented tasks there.
+4. Run safe checks on the release branch.
+5. Merge the release branch into `main` with `git merge --no-ff <release-branch>`.
+6. Tag the resulting `main` commit with the release version. Every commit in `main` must have its own release tag.
+7. Merge the release branch back into `dev` with `git merge --no-ff <release-branch>` so critical release updates are available to new features. If `dev` has progressed since the release branch was cut, resolve conflicts deliberately.
+8. Delete the release branch only after owner approval and after both `main` and `dev` have received it.
+9. Run safe checks after the `main` and `dev` merges where practical.
 10. Push branches, tags, and release artifacts only after owner approval.
 
 ## Publishing A Hotfix
 
-Hotfix publication starts from production, not from integration and not from a feature branch.
+Hotfix publication starts from `main`, not from `dev` and not from a feature branch.
 
 If the user asks to publish a hotfix while currently on a feature or `feat` branch:
 
-1. Do not merge the feature branch into integration just to start the hotfix.
+1. Do not merge the feature branch into `dev` just to start the hotfix.
 2. Preserve the feature work first. Prefer committing the current feature changes on the feature branch with a clear WIP or narrow commit message. If the owner does not want a commit, ask before using stash.
-3. Leave the feature branch intact and switch to the production branch.
-4. Create the hotfix branch from production only after the feature work is safely parked.
+3. Leave the feature branch intact and switch to `main`.
+4. Create the hotfix branch from `main` only after the feature work is safely parked.
 
 Normal hotfix flow:
 
-1. Start from the production branch: `main` or `master`.
-2. Create `hotfix/<version-or-name>` from production.
+1. Start from `main`.
+2. Create `hotfix/<version-or-name>` from `main`.
 3. Make the minimal urgent fix and any required release metadata or version bump on the hotfix branch.
 4. Run safe checks on the hotfix branch.
-5. Merge the hotfix branch into production with `--no-ff`.
-6. Tag the production branch at the hotfix merge commit.
-7. Merge the hotfix branch back into integration with `--no-ff` so ongoing development receives the fix and metadata.
-8. Resolve conflicts in favor of preserving both the production fix and valid ongoing integration changes.
-9. Push branches, tags, and release artifacts only after owner approval.
+5. Merge the hotfix branch into `main` with `git merge --no-ff <hotfix-branch>`.
+6. Tag the resulting `main` commit with the updated version. Every commit in `main` must have its own release tag.
+7. Merge the hotfix branch back into `dev` with `git merge --no-ff <hotfix-branch>` so ongoing development receives the fix and metadata. If a release branch is currently active, merge the hotfix into that release branch instead of, or before, `dev` according to the project policy.
+8. Delete the hotfix branch only after owner approval and after the required target branches have received it.
+9. Resolve conflicts in favor of preserving both the `main` fix and valid ongoing `dev` or release-branch changes.
+10. Push branches, tags, and release artifacts only after owner approval.
 
 ## Versioning Principles
 
 - Feature branches do not own release version bumps.
-- Release branches own planned release version bumps.
-- Hotfix branches own urgent patch version bumps.
-- Production tags should point at production merge commits, not at arbitrary feature commits.
+- Release branches own planned release version bumps and release-oriented metadata.
+- Hotfix branches own urgent production patch version bumps and hotfix metadata.
+- Every commit in `main` is a release commit and must have its own tag.
+- Production tags belong on `main` history after release or hotfix completion, not on arbitrary feature commits.
 
 ## Final Report
 
 Report the final state with:
 
 - Branches created, merged, or left untouched.
-- Exact commits moved into integration or production.
+- Exact commits moved into `dev` or `main`.
 - Version bump commit, if any.
 - Tags created, if any.
 - Checks run and checks intentionally skipped.
