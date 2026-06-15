@@ -95,8 +95,10 @@ print-command-opencode:
     cd '{{SANDBOXED_DIR}}'
     SANDBOXED_HOME='{{SANDBOXED_DIR}}' ./src/sandboxed.sh --just-print=commands --target opencode sh -c 'printf "sandboxed-smoke=ok\n"; id; pwd; printf "HOME=%s\n" "$HOME"; printf "XDG_CONFIG_HOME=%s\n" "$XDG_CONFIG_HOME"; command -v opencode; opencode --version; sudo -n true; printf "sudo=ok\n"'
 
+check-real-starts: check-real-start-opencode
+
 # Explicit runtime smoke: may build an image and start a disposable container.
-smoke-opencode-env:
+check-real-start-opencode:
     #!/usr/bin/env bash
     set -euo pipefail
     sandboxed_dir='{{SANDBOXED_DIR}}'
