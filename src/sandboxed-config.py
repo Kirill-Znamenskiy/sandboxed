@@ -190,7 +190,15 @@ def emit_plan(result):
             project_config.get("container_target", ""),
         )
 
-    for lock in sandboxed.get("locks", []) or []:
+    locks = sandboxed.get("locks", {}) or {}
+    if not isinstance(locks, dict):
+        raise ValueError("x-sandboxed.locks must be a mapping")
+    lock_checks_enabled = locks.get("enabled", True)
+    if not isinstance(lock_checks_enabled, bool):
+        raise ValueError("x-sandboxed.locks.enabled must be a boolean")
+    emit_record("lock_checks_enabled", "true" if lock_checks_enabled else "false")
+
+    for lock in locks.get("checks", []) or []:
         if not isinstance(lock, dict) or not lock.get("path"):
             raise ValueError(f"Invalid lock item: {lock!r}")
         suffixes = lock.get("related_suffixes", []) or []

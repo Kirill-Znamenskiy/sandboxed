@@ -6,7 +6,7 @@ list:
     @just --justfile '{{SANDBOXED_DIR}}/JustFile' --list --unsorted
 
 # Safe checks only: no container build/run.
-check: check-static check-config-opencode check-command-opencode
+check: check-static check-config-opencode check-locks-override-opencode check-command-opencode
 
 check-static:
     #!/usr/bin/env bash
@@ -36,8 +36,33 @@ check-config-opencode:
     XDG_STATE_HOME="$tmp_dir/state" \
         ./src/sandboxed.sh --just-print=config opencode > "$tmp_dir/config.yaml"
 
-    python3 -c 'from pathlib import Path; import sys, yaml; data=yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8")); sandboxed_dir=Path(sys.argv[2]); levels={level["name"]: level for level in data["levels"]}; service=data["compose"]["services"]["sandboxed"]; assert data["target"] == "opencode", "Unexpected target in printed config"; assert data["dockerfile"] == str(sandboxed_dir / "targets" / "opencode" / "Dockerfile"), "Unexpected Dockerfile path in printed config"; assert levels["install"]["compose_exists"], "Install-level opencode compose.yaml was not loaded"; assert service["command"] == ["opencode"], "Unexpected opencode command in effective config"; assert service["environment"]["HOME"] == "/home/wrkuser", "Unexpected container HOME"; assert data["compose"]["x-sandboxed"]["symlinks"]["mode"] == "automount", "Unexpected symlink mode"' "$tmp_dir/config.yaml" "$sandboxed_dir"
+    python3 -c 'from pathlib import Path; import sys, yaml; data=yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8")); sandboxed_dir=Path(sys.argv[2]); levels={level["name"]: level for level in data["levels"]}; service=data["compose"]["services"]["sandboxed"]; sandboxed=data["compose"]["x-sandboxed"]; assert data["target"] == "opencode", "Unexpected target in printed config"; assert data["dockerfile"] == str(sandboxed_dir / "targets" / "opencode" / "Dockerfile"), "Unexpected Dockerfile path in printed config"; assert levels["install"]["compose_exists"], "Install-level opencode compose.yaml was not loaded"; assert service["command"] == ["opencode"], "Unexpected opencode command in effective config"; assert service["environment"]["HOME"] == "/home/wrkuser", "Unexpected container HOME"; assert sandboxed["symlinks"]["mode"] == "automount", "Unexpected symlink mode"; assert sandboxed["locks"]["enabled"] is True, "Unexpected lock check default"; assert sandboxed["locks"]["checks"], "Expected opencode lock checks"' "$tmp_dir/config.yaml" "$sandboxed_dir"
     printf '%s\n' 'OK check-config-opencode'
+
+check-locks-override-opencode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    sandboxed_dir='{{SANDBOXED_DIR}}'
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    mkdir -p "$tmp_dir/project/.sandboxed/opencode"
+    printf '%s\n' \
+        'x-sandboxed:' \
+        '  locks:' \
+        '    enabled: false' \
+        > "$tmp_dir/project/.sandboxed/opencode/compose.yaml"
+    cd "$tmp_dir/project"
+
+    SANDBOXED_HOME="$sandboxed_dir" \
+    XDG_CONFIG_HOME="$tmp_dir/config" \
+    XDG_DATA_HOME="$tmp_dir/data" \
+    XDG_CACHE_HOME="$tmp_dir/cache" \
+    XDG_STATE_HOME="$tmp_dir/state" \
+        "$sandboxed_dir/src/sandboxed.sh" --just-print=config opencode > "$tmp_dir/config.yaml"
+
+    python3 -c 'from pathlib import Path; import sys, yaml; data=yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8")); locks=data["compose"]["x-sandboxed"]["locks"]; assert locks["enabled"] is False, "Project override should disable lock checks"; assert locks["checks"], "Project override should preserve inherited lock definitions"' "$tmp_dir/config.yaml"
+    printf '%s\n' 'OK check-locks-override-opencode'
 
 check-command-opencode:
     #!/usr/bin/env bash
@@ -89,7 +114,8 @@ smoke-opencode-env:
         'x-sandboxed:' \
         '  symlinks:' \
         '    scan: []' \
-        '  locks: []' \
+        '  locks:' \
+        '    enabled: false' \
         > "$tmp_dir/project/.sandboxed/opencode/compose.yaml"
     cd "$tmp_dir/project"
 
