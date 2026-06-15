@@ -26,17 +26,34 @@ For the shipped `opencode` target, the image build uses Alpine packages and down
 
 ## Installation
 
-After this repository is configured as a Homebrew tap, install the launcher with:
+Current Homebrew workflow:
+
+```sh
+brew tap Kirill-Znamenskiy/sandboxed
+brew trust --tap Kirill-Znamenskiy/sandboxed
+brew install sandboxed
+```
+
+After the tap is configured, the normal install command is:
 
 ```sh
 brew install sandboxed
 ```
 
-For a fresh machine, first add the tap explicitly:
+For development against a local checkout of `Kirill-Znamenskiy/homebrew-sandboxed`, point the tap at that checkout instead:
 
 ```sh
-brew tap Kirill-Znamenskiy/sandboxed git@github.com:Kirill-Znamenskiy/sandboxed.git
+cd /path/to/homebrew-sandboxed
+brew tap Kirill-Znamenskiy/sandboxed "$PWD"
+brew trust --tap Kirill-Znamenskiy/sandboxed
 brew install sandboxed
+```
+
+To pick up later changes from the tap:
+
+```sh
+brew update
+brew upgrade sandboxed
 ```
 
 The Homebrew formula installs launcher source under Homebrew `libexec`, installs shipped targets from `targets/`, creates both `sandboxed` and `sbxd` commands, and uses user/project config from the normal XDG/project locations.
