@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-sandboxed_version="0.0.4"
+sandboxed_version="0.0.5"
 
 usage() {
     cat <<'EOF'
