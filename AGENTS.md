@@ -13,8 +13,11 @@ Use GitFlow-style branching:
 - `main` is release-only. Do not commit ordinary development fixes directly to `main`.
 - `dev` is the integration branch for ongoing work.
 - New product changes should happen on named feature branches from `dev`.
-- Merge feature branches back to `dev` with `--no-ff`; do not fast-forward GitFlow merges.
-- Merge `dev` back to `main` only for a deliberate release/stable checkpoint, also with `--no-ff`.
+- Release preparation happens on named release branches from `dev`, such as `release/v0.0.4`.
+- Release branches collect one or more feature branches with `--no-ff`; do not fast-forward GitFlow merges.
+- Version bumps belong on release branches, after the intended feature merges are collected and before merging to `main`.
+- Merge release branches back to `dev` with `--no-ff` so the integration branch receives the exact released state.
+- Merge release branches to `main` only for a deliberate release/stable checkpoint, also with `--no-ff`.
 
 Keep the repository root sparse:
 

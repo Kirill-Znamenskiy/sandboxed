@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-sandboxed_version="0.0.3"
+sandboxed_version="0.0.4"
 
 usage() {
     cat <<'EOF'
@@ -186,6 +186,7 @@ config_command_args=()
 symlink_scan_host_dirs=()
 symlink_scan_container_dirs=()
 symlink_mode="automount"
+lock_checks_enabled=1
 lock_paths=()
 lock_suffixes=()
 opencode_project_config=""
@@ -248,6 +249,13 @@ load_target_plan() {
             symlink_scan)
                 symlink_scan_host_dirs+=("$first")
                 symlink_scan_container_dirs+=("$second")
+                ;;
+            lock_checks_enabled)
+                if [ "$first" = "false" ]; then
+                    lock_checks_enabled=0
+                else
+                    lock_checks_enabled=1
+                fi
                 ;;
             opencode_project_config)
                 opencode_project_config="$first"
@@ -449,6 +457,10 @@ image_exists() {
 
 check_locks() {
     local i=0
+
+    if [ "$lock_checks_enabled" != 1 ]; then
+        return 0
+    fi
 
     if [ "$just_print_command" = 1 ] || ! command -v fuser >/dev/null 2>&1; then
         return 0
