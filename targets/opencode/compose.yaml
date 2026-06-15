@@ -4,8 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        WRK_USER_ID: ${SANDBOXED_HOST_UID}
-        WRK_GROUP_ID: ${SANDBOXED_HOST_GID}
         WRK_USER_HOME_DIR: ${SANDBOXED_CONTAINER_HOME}
     command:
       - opencode

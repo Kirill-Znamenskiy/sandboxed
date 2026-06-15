@@ -157,8 +157,8 @@ Work:
 
 * implement runtime selection: `podman` first, then `docker`;
 * split build command construction from run command construction;
-* preserve `podman --userns keep-id` for Podman;
-* use `--user "$(id -u):$(id -g)"` for Docker as the practical portable baseline;
+* preserve Podman keep-id mapping while using stable internal image user IDs;
+* use `--user "$(id -u):$(id -g)"` and matching build args for Docker as the practical portable baseline;
 * keep common flags such as `--rm`, `--interactive`, `--tty`, and `--cap-drop ALL` while preserving passwordless `sudo` inside the container;
 * ensure image naming does not collide across target, runtime, and UID.
 
