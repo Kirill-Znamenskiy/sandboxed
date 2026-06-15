@@ -3,7 +3,7 @@ class Sandboxed < Formula
 
   desc "Run command-line tools inside disposable project containers"
   homepage "https://github.com/Kirill-Znamenskiy/sandboxed"
-  url "https://github.com/Kirill-Znamenskiy/sandboxed.git", branch: "main"
+  url "git@github.com:Kirill-Znamenskiy/sandboxed.git", branch: "main"
   version "0.0.1"
   license "MIT"
 
