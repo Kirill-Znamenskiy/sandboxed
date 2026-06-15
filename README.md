@@ -136,12 +136,12 @@ The launcher should automatically select the container runtime:
 
 Runtime selection should not require a launch option in the normal path.
 
-Podman images use a stable internal `wrkuser` UID/GID and should run with `--userns keep-id:uid=<wrkuser-uid>,gid=<wrkuser-gid>` plus `--user <wrkuser-uid>:<wrkuser-gid>`, so bind mounts still write as the host user without baking host-specific IDs into the image. Docker does not have the same portable keep-id behavior, so the practical baseline is to run as the host UID/GID with `--user "$(id -u):$(id -g)"` and to build images with matching user/group build args.
+Podman should use `--userns keep-id` where possible. Docker does not have the same portable keep-id behavior, so the practical baseline is to run as the host UID/GID with `--user "$(id -u):$(id -g)"` and to build images with matching user/group build args.
 
 Both runtimes should preserve the common security envelope where supported:
 
 * drop Linux capabilities by default;
-* avoid host-root execution and write bind mounts as the host user;
+* run as the host user rather than as root;
 * keep passwordless `sudo` usable inside the container;
 * keep containers disposable by default.
 
